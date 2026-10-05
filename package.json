@@ -1,0 +1,150 @@
+{
+  "name": "hr-agent",
+  "version": "1.0.0",
+  "//type": "ESM, not CommonJS. Not cosmetic: `@cap-js/agents` is an ESM package, and `@langchain/core` ships separate type definitions per module system (`.d.ts` for ESM, `.d.cts` for CJS). A CJS consumer would resolve LangChain types from `.d.cts` while the plugin carries the `.d.ts` variant, so TypeScript sees two structurally identical but nominally distinct types and rejects the assignment. Matching module systems collapses them into one, and cds-typer emits ESM automatically once this flag is set.",
+  "type": "module",
+  "//dependencies": "`@cap-js/agents` brings its own runtime stack (@a2a-js/sdk, langchain, deepagents, @sap-ai-sdk/*, @cap-js/mcp, @cap-js/attachments); none of that is repeated here. The @sap-cloud-sdk packages provide destination and connectivity access, so on-premise systems can be reached through the Cloud Connector.",
+  "dependencies": {
+    "@cap-js/agents": "^0.9.6",
+    "@cap-js/hana": "^3",
+    "@pdf-lib/fontkit": "^1.1.1",
+    "@sap-cloud-sdk/connectivity": "^4",
+    "@sap-cloud-sdk/http-client": "^4",
+    "@sap-cloud-sdk/resilience": "^4.8.0",
+    "@sap/cds": "^10.0.5",
+    "@sap/xssec": "^4",
+    "dejavu-fonts-ttf": "^2.37.3",
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@cap-js/cds-test": "^1.0.2",
+    "@cap-js/cds-typer": ">=0.1",
+    "@cap-js/cds-types": "^0.18.0",
+    "@cap-js/sqlite": "^3",
+    "@sap/cds-dk": "^10",
+    "@sap/dev-cap-tools": "^1.31.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4",
+    "typescript": "^6.0.0",
+    "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch": "cds watch",
+    "db:reset": "cds deploy --to sqlite:db.sqlite",
+    "test": "vitest run",
+    "test:types": "tsc -p tsconfig.test.json --noEmit",
+    "hybrid": "cds watch --profile hybrid",
+    "build": "mbt build",
+    "//deploy": "The archive is picked by recency rather than by name, because the file is called `<MTA ID>_<version>.mtar` and the ID has to be changed when several people deploy into one space (see the Deploy section of the readme). Hard-coding the name would mean remembering to change it in two places. Needs a POSIX shell; on Windows use Git Bash.",
+    "deploy": "cf deploy \"$(ls -t mta_archives/*.mtar | head -1)\" --retries 1",
+    "build:deploy": "npm run build && npm run deploy",
+    "watch:claude": "cds watch --profile with-claude,development"
+  },
+  "private": true,
+  "imports": {
+    "#cds-models/*": "./@cds-models/*/index.js"
+  },
+  "cds": {
+    "//requires": "A2A tasks, checkpoints and the protocol adapter come from the @cap-js/agents plugin; only what is specific to this app lives here. `cds env get requires` shows the merged result.",
+    "requires": {
+      "//[development]": "`llm-mock` is the plugin's built-in stand-in model, so `cds watch` and the requests in test/http/local.http need no AI Core.",
+      "[development]": {
+        "//auth": "Mocked users, one per seeded employee (db/data/hr-Employees.csv links them by `userId`). The HR services resolve the employee from the logged-in user, so `dummy` - which makes everyone the same privileged user - would leave nobody to file leave for. Log in as `alice`, `bob` or `carol` with an empty password; the browser asks once for the chat preview.",
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "alice": {
+              "roles": [
+                "Employee"
+              ]
+            },
+            "bob": {
+              "roles": [
+                "Employee"
+              ]
+            },
+            "carol": {
+              "roles": [
+                "Employee",
+                "Manager"
+              ]
+            }
+          }
+        },
+        "//db": "A SQLite file rather than in-memory, so leave requests and their PDFs survive a restart. Create or reset it with `npm run db:reset`.",
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "url": "db.sqlite"
+          }
+        },
+        "llm": {
+          "kind": "llm-mock"
+        }
+      },
+      "//[production]": "Profile-scoped overrides live at this level rather than inside the `llm` entry itself: CAP resolves a nested `[profile]` block only for an entry that already carries a `kind`, and putting one there would pin `impl` to a single provider for every profile.",
+      "[production]": {
+        "//auth": "DEVELOPMENT DEPLOYMENT - NOT A PRODUCTION SETTING. `dummy` assigns every request CAP's privileged user, for whom `user.has(...)` is true for any role, so `@requires: 'authenticated-user'` on the agent passes without anyone logging in. The reason: the chat preview the plugin serves at /a2a/<slug>/preview/ is an ordinary browser page, and a browser puts no bearer token on a navigation request - under `ias` it gets a 401, and the Basic dialog that follows is useless, because the IAS strategy validates JWTs and nothing else. Reaching it properly needs an approuter module to run the interactive login and forward the token. What this costs: the deployed agent is open to anyone who knows the URL, they spend the subaccount's AI Core quota, and a tool reading a backend does so under the destination's technical user, because there is no principal left to propagate. Put `ias` back - together with an IAS resource in mta.yaml and an approuter - before this is used with real data.",
+        "auth": "dummy",
+        "llm": {
+          "kind": "aicore",
+          "destinationName": "AICORE_DESTINATION",
+          "resourceGroup": "default"
+        }
+      },
+      "[hybrid]": {
+        "//auth": "The same mocked users as in development: the HR services need a real user to resolve the employee from, and the hybrid profile is where the agent actually talks to a model. Log in as `alice`, `bob` or `carol` with an empty password.",
+        "auth": {
+          "kind": "mocked",
+          "users": {
+            "alice": {
+              "roles": [
+                "Employee"
+              ]
+            },
+            "bob": {
+              "roles": [
+                "Employee"
+              ]
+            },
+            "carol": {
+              "roles": [
+                "Employee",
+                "Manager"
+              ]
+            }
+          }
+        },
+        "//db": "Pinned to in-memory SQLite. Outside the development profile CAP resolves `db` to `hana` because @cap-js/hana is a runtime dependency, and without a bound HANA instance that fails at startup with `ERR_MISSING_ARGS` from the hdb driver. `credentials.url` has to be spelled out too: naming the kind alone lands on the file database `db.sqlite`, which nothing deploys the schema into, so the first task write fails with `no such table: cds_outbox_Messages`. The only thing this app persists is the plugin's A2A task store, which a hybrid run — real AI Core, real destinations, local process — has no reason to keep. Bind the HDI container with `cds bind -2 hr-agent-db` if a run ever needs to survive a restart.",
+        "db": {
+          "kind": "sqlite",
+          "credentials": {
+            "url": ":memory:"
+          }
+        },
+        "llm": {
+          "kind": "aicore",
+          "destinationName": "AICORE_DESTINATION",
+          "resourceGroup": "default"
+        }
+      },
+      "//llm": "@cap-js/agents resolves the chat model from this entry rather than from an env variable. `destinationName` (set per profile above) selects the destination-based flavour of the `aicore` kind — this subaccount has no bindable `aicore` service instance, only the subaccount destination AICORE_DESTINATION. Stay on a model that accepts `temperature: 0`, which is what the plugin sends for agents built from AGENTS.md: the Opus models reject it, and the rejection arrives inside the SSE stream — a perfectly healthy HTTP 200 followed by `Error while iterating over SSE stream.`",
+      "llm": {
+        "model": "anthropic--claude-4.5-sonnet"
+      },
+      "connectivity": true,
+      "destinations": true,
+      "//[with-claude]": "Local runs against the Anthropic API instead of llm-mock: `npm run watch:claude` with ANTHROPIC_API_KEY set in the environment (never in a file). Development settings (mocked users, db.sqlite) stay in effect.",
+      "[with-claude]": {
+        "llm": {
+          "kind": "anthropic",
+          "model": "claude-sonnet-5-5"
+        }
+      }
+    }
+  }
+}

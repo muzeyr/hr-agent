@@ -1,0 +1,87 @@
+@server=https://<your-org>-<your-space>-hr-agent-srv.cfapps.<region>.hana.ondemand.com
+@agent=/a2a/hr-agent
+
+# The deployed agent. Largely the same requests as hybrid.http, against Cloud
+# Foundry - the point of running them again is what only exists there: the
+# route, AI Core reached from the cloud, and a HANA-backed task store instead
+# of SQLite.
+#
+# Adjust @server after the first deploy; the host follows the org, space and
+# module name in mta.yaml.
+#
+# No Authorization header anywhere below, and no token request to obtain one:
+# the deployed agent runs with `auth: dummy` - see the `[production].auth`
+# comment in package.json for what that trades away and why. What this file
+# therefore does not prove is a real user identity reaching an on-premise
+# backend. That needs an IAS binding.
+
+
+### Agent card
+# @name agent_card
+GET {{server}}{{agent}}/.well-known/agent-card.json
+
+
+### Ask something that needs the tool
+# @name add_via_agent
+POST {{server}}{{agent}}/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-1",
+      "role": "user",
+      "parts": [
+        { "kind": "text", "text": "What is 1204 plus 96?" }
+      ]
+    }
+  }
+}
+
+
+### Follow-up in the same conversation
+# @name add_followup
+POST {{server}}{{agent}}/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "2",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-2",
+      "role": "user",
+      "contextId": "{{add_via_agent.response.body.result.contextId}}",
+      "parts": [
+        { "kind": "text", "text": "Now add 500 to that result." }
+      ]
+    }
+  }
+}
+
+
+### Read the task back
+# Worth doing here specifically: on Cloud Foundry the task store is HANA, so a
+# task that comes back proves db/index.cds made it into the deployed schema.
+# @name task_get
+POST {{server}}{{agent}}/
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": "3",
+  "method": "tasks/get",
+  "params": { "id": "{{add_via_agent.response.body.result.id}}" }
+}
+
+
+### Chat preview
+# Not a request to run - the URL to open in a browser. Works without a login
+# for exactly as long as `auth: dummy` and `CDS_SERVER_INDEX` stay in place.
+# {{server}}{{agent}}/preview/

@@ -1,0 +1,4 @@
+ID;userId;firstName;lastName;email;department;manager_ID;annualLeaveEntitlement;hireDate
+E1001;carol;Carol;White;carol.white@example.com;Finance;;20;2015-02-01
+E1002;alice;Alice;Smith;alice.smith@example.com;Finance;E1001;14;2022-03-01
+E1003;bob;Bob;Miller;bob.miller@example.com;IT;E1001;14;2024-09-16

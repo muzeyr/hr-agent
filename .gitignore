@@ -1,0 +1,26 @@
+node_modules/
+target/
+_out/
+gen/
+logs
+
+# Local environment: destination host names, proxy ports, and the Cloud Foundry
+# org, space and service keys of the hybrid binding. Start from `.env.example`
+# and run `cds bind` to create your own.
+.env
+.cdsrc-private.json
+*.mtaext
+
+default-*.json
+*.sqlite
+
+# MTA
+mta_archives/
+*_mta_build_tmp
+*.mtar
+
+# Other
+.DS_Store
+
+# @cap-js/cds-typer
+@cds-models

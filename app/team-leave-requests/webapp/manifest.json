@@ -1,0 +1,66 @@
+{
+  "_version": "1.59.0",
+  "sap.app": {
+    "id": "hr.teamleaverequests",
+    "type": "application",
+    "title": "Team Leave Requests",
+    "description": "Leave requests of your team: who asked for what, what waits for you, and what you decided.",
+    "applicationVersion": { "version": "1.0.0" },
+    "dataSources": {
+      "mainService": {
+        "uri": "/odata/v4/leave/",
+        "type": "OData",
+        "settings": { "odataVersion": "4.0" }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
+  },
+  "sap.ui5": {
+    "flexEnabled": false,
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": { "sap.m": {}, "sap.ui.core": {}, "sap.fe.templates": {} }
+    },
+    "models": {
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": { "operationMode": "Server", "autoExpandSelect": true, "earlyRequests": true }
+      }
+    },
+    "routing": {
+      "routes": [
+        { "pattern": ":?query:", "name": "LeaveRequestsList", "target": "LeaveRequestsList" },
+        { "pattern": "TeamLeaveRequests({key}):?query:", "name": "LeaveRequestsObjectPage", "target": "LeaveRequestsObjectPage" }
+      ],
+      "targets": {
+        "LeaveRequestsList": {
+          "type": "Component",
+          "id": "LeaveRequestsList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/TeamLeaveRequests",
+              "variantManagement": "None",
+              "initialLoad": "Enabled",
+              "navigation": { "TeamLeaveRequests": { "detail": { "route": "LeaveRequestsObjectPage" } } },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": { "tableSettings": { "type": "GridTable", "rowCountMode": "Auto" } }
+              }
+            }
+          }
+        },
+        "LeaveRequestsObjectPage": {
+          "type": "Component",
+          "id": "LeaveRequestsObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": { "settings": { "contextPath": "/TeamLeaveRequests", "editableHeaderContent": false } }
+        }
+      }
+    }
+  },
+  "sap.fiori": { "registrationIds": [], "archeType": "transactional" }
+}

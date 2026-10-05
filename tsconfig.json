@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "sourceMap": true,
+    "allowJs": true,
+    // The CAP `typescript` build task compiles into gen/srv and expects the
+    // project layout to be preserved there, i.e. srv/*.ts → gen/srv/srv/*.js.
+    // Without an explicit rootDir, TypeScript 6 infers the common source
+    // directory — `./srv`, since that is currently the only source folder —
+    // and refuses to guess: `TS5011: The 'rootDir' setting must be explicitly
+    // set`. It would also silently move the output up one level the moment a
+    // second top-level folder joins the `include` list.
+    "rootDir": ".",
+    // `@cap-js/cds-types` is an ambient `declare module '@sap/cds'`, so pulling
+    // it in as a type package is enough to type the import. Do not wire it up
+    // with a `paths` entry: a directory substitution no longer resolves under
+    // NodeNext (leaving every `cds` import as `any`), and pointing `paths` at
+    // the .d.ts file has a runtime cost — tsx honours `paths` when CAP loads
+    // service implementations, so `cds.ApplicationService` would be undefined.
+    "types": ["node", "@cap-js/cds-types"],
+    "paths": {
+      "#cds-models/*": ["./@cds-models/*"]
+    }
+  },
+  "include": ["srv/**/*.ts", "@cds-models/**/*.ts"]
+}

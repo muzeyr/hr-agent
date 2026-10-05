@@ -1,0 +1,8 @@
+code;name;billable
+development;Development;true
+analysis;Analysis;true
+testing;Testing;true
+meeting;Meeting;true
+support;Support;true
+documentation;Documentation;true
+training;Training;false

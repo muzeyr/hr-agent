@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    // Syntax, navigation and compile errors for .cds files. Without it the
+    // agent service is a wall of grey text.
+    "SAPSE.vscode-cds",
+    // Sends the requests in test/http/*.http straight from the editor. Those
+    // files are the only way to talk to the agent, so this is not optional.
+    "humao.rest-client",
+    // .github/copilot-instructions.md and .github/skills/ are written for it.
+    "GitHub.copilot",
+    "GitHub.copilot-chat"
+  ]
+}

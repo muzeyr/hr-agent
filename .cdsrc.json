@@ -1,0 +1,10 @@
+{
+  "//build": "The tasks are spelled out rather than left to auto-detection, so a plugin that registers a build task of its own becomes visible here instead of silently joining the build. Keep the list in sync when a plugin is added.",
+  "build": {
+    "tasks": [
+      { "src": ".", "for": "typescript" },
+      { "src": "db", "for": "hana" },
+      { "src": "srv", "for": "nodejs" }
+    ]
+  }
+}

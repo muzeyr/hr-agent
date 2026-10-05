@@ -1,0 +1,66 @@
+{
+  "_version": "1.59.0",
+  "sap.app": {
+    "id": "hr.timesheet",
+    "type": "application",
+    "title": "My Timesheet",
+    "description": "Your bookings: date, project, activity, hours and whether the week was submitted.",
+    "applicationVersion": { "version": "1.0.0" },
+    "dataSources": {
+      "mainService": {
+        "uri": "/odata/v4/timesheet/",
+        "type": "OData",
+        "settings": { "odataVersion": "4.0" }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": { "desktop": true, "tablet": true, "phone": true }
+  },
+  "sap.ui5": {
+    "flexEnabled": false,
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": { "sap.m": {}, "sap.ui.core": {}, "sap.fe.templates": {} }
+    },
+    "models": {
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": { "operationMode": "Server", "autoExpandSelect": true, "earlyRequests": true }
+      }
+    },
+    "routing": {
+      "routes": [
+        { "pattern": ":?query:", "name": "TimeEntriesList", "target": "TimeEntriesList" },
+        { "pattern": "MyTimeEntries({key}):?query:", "name": "TimeEntriesObjectPage", "target": "TimeEntriesObjectPage" }
+      ],
+      "targets": {
+        "TimeEntriesList": {
+          "type": "Component",
+          "id": "TimeEntriesList",
+          "name": "sap.fe.templates.ListReport",
+          "options": {
+            "settings": {
+              "contextPath": "/MyTimeEntries",
+              "variantManagement": "None",
+              "initialLoad": "Enabled",
+              "navigation": { "MyTimeEntries": { "detail": { "route": "TimeEntriesObjectPage" } } },
+              "controlConfiguration": {
+                "@com.sap.vocabularies.UI.v1.LineItem": { "tableSettings": { "type": "GridTable", "rowCountMode": "Auto" } }
+              }
+            }
+          }
+        },
+        "TimeEntriesObjectPage": {
+          "type": "Component",
+          "id": "TimeEntriesObjectPage",
+          "name": "sap.fe.templates.ObjectPage",
+          "options": { "settings": { "contextPath": "/MyTimeEntries", "editableHeaderContent": false } }
+        }
+      }
+    }
+  },
+  "sap.fiori": { "registrationIds": [], "archeType": "transactional" }
+}

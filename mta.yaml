@@ -1,0 +1,90 @@
+_schema-version: 3.3.0
+# Cloud Foundry keys a deployment by the MTA ID: two deployments under the same
+# ID in one space do not give two agents - the second replaces the first,
+# without saying so. Change the ID when deploying a second copy.
+ID: hr-agent
+version: 1.0.0
+description: "HR Agent - annual leave by chat, built with CAP and @cap-js/agents."
+parameters:
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+modules:
+  - name: hr-agent-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      # CAP plus the agent runtime (LangGraph, @sap-ai-sdk, the A2A SDK) peaks
+      # noticeably higher while booting than it idles at, and an instance that
+      # overshoots is SIGKILLed with exit 137 - which the deploy only reports as
+      # "Some instances have crashed". The `Medium` space quota grants 2G in
+      # total, so 1G leaves room for the db-deployer to run alongside during a
+      # deployment.
+      memory: 160MB
+      disk-quota: 1G
+      buildpack: nodejs_buildpack
+      routes:
+        - route: "${default-url}"
+        - route: "${default-host}.cert.${default-domain}"
+    properties:
+      # Second half of the development setup described at `[production].auth` in
+      # package.json. The chat preview is mounted only when
+      # `cds.env.server.index` is true, and CAP derives that from
+      # `!production` - the Node.js buildpack sets `NODE_ENV=production`, so a
+      # deployed agent has none. The symptom is misleading: the A2A router runs
+      # its `@requires` check before the preview mount, so the absent route
+      # answers 401 rather than 404, which reads like a login problem.
+      #
+      # This also re-enables CAP's index page at `/`, listing the served
+      # services; there is no switch for the preview alone. Drop this property
+      # and the preview is gone again.
+      CDS_SERVER_INDEX: true
+    # No `AICORE_DESTINATION` env var: @cap-js/agents resolves the chat model
+    # from `cds.requires.llm` in package.json, which names the destination via
+    # `destinationName`. The destination itself lives in the subaccount and only
+    # has to be visible to this space.
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api # required by consumers of CAP services (e.g. approuter)
+        properties:
+          srv-url: ${default-url}
+          srv-cert-url: '${protocol}://${default-host}.cert.${default-domain}'
+    requires:
+      - name: hr-agent-connectivity
+      - name: hr-agent-destination
+      - name: hr-agent-db
+
+  - name: hr-agent-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    requires:
+      - name: hr-agent-db
+
+  # There is no UI module, and no html5-apps-repo resource to host one: `@agent`
+  # makes the service speak A2A, which is consumed by another agent or an A2A
+  # client, not by a browser. Adding a UI later means adding an approuter as
+  # well - the html5 repo alone does not serve anything.
+resources:
+  - name: hr-agent-db
+    type: com.sap.xs.hdi-container
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: hr-agent-connectivity
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-plan: lite
+  - name: hr-agent-destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-plan: lite

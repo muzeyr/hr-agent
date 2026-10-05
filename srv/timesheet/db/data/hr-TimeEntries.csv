@@ -1,0 +1,7 @@
+ID;employee_ID;workDate;project_ID;activityType_code;hours;description;status
+7a000000-0000-4000-8000-000000000001;E1002;2026-09-28;P100;development;6;Data migration scripts;draft
+7a000000-0000-4000-8000-000000000002;E1002;2026-09-28;P100;meeting;2;Sprint planning;draft
+7a000000-0000-4000-8000-000000000003;E1002;2026-09-29;P100;development;8;Data migration scripts;draft
+7a000000-0000-4000-8000-000000000004;E1002;2026-09-30;P100;testing;5;Migration dry run;draft
+7a000000-0000-4000-8000-000000000005;E1002;2026-09-30;P900;training;3;CAP agents training;draft
+7a000000-0000-4000-8000-000000000006;E1002;2026-10-01;P100;analysis;8;Cut-over plan;draft

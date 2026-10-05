@@ -1,0 +1,109 @@
+@server=http://localhost:4004
+@agent=/a2a/hr-agent
+@leave=/odata/v4/leave
+
+# Local runs use the `llm-mock` model — the plugin's stand-in, which returns
+# canned text and never calls a tool. The A2A requests below therefore prove
+# the plumbing (routing, agent card, task persistence), not the answers. The
+# LeaveService requests further down exercise the actual rules and the PDF;
+# test/integration covers the agent's tools end to end.
+#
+# Logins are the mocked users from package.json: alice, bob, carol, all with
+# an empty password. The chat preview is at
+# http://localhost:4004/a2a/hr-agent/preview/ (the browser asks once).
+
+
+### Agent card — what an A2A client discovers the agent by
+# @name agent_card
+GET {{server}}{{agent}}/.well-known/agent-card.json
+Authorization: Basic alice:
+
+
+### Ask the agent (JSON-RPC, A2A `message/send`)
+# @name message_send
+POST {{server}}{{agent}}/
+Content-Type: application/json
+Authorization: Basic alice:
+
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-1",
+      "role": "user",
+      "parts": [
+        { "kind": "text", "text": "I'd like to take 3 days of annual leave starting 10 November, can you plan it?" }
+      ]
+    }
+  }
+}
+
+
+### LeaveService — Alice's balance
+GET {{server}}{{leave}}/getBalance()
+Authorization: Basic alice:
+
+
+### LeaveService — plan 3 working days from 10 November 2026 (saves nothing)
+GET {{server}}{{leave}}/planLeave(startDate=2026-11-10,workingDays=3)
+Authorization: Basic alice:
+
+
+### LeaveService — a plan across the 29 October holiday and a weekend
+GET {{server}}{{leave}}/planLeave(startDate=2026-10-28,workingDays=3)
+Authorization: Basic alice:
+
+
+### LeaveService — file the request and create its PDF
+# @name submit
+POST {{server}}{{leave}}/submitLeave
+Content-Type: application/json
+Authorization: Basic alice:
+
+{ "startDate": "2026-11-10", "workingDays": 3, "reason": "Family visit" }
+
+
+### LeaveService — download the PDF of the request filed above
+GET {{server}}{{submit.response.body.pdfUrl}}
+Authorization: Basic alice:
+
+
+### LeaveService — the same PDF as another employee: 404
+GET {{server}}{{submit.response.body.pdfUrl}}
+Authorization: Basic bob:
+
+
+### LeaveService — Alice's requests this year
+GET {{server}}{{leave}}/getLeaveRequests()
+Authorization: Basic alice:
+
+
+### LeaveService — as the manager: requests of the team waiting for approval
+# @name pending
+GET {{server}}{{leave}}/getPendingApprovals()
+Authorization: Basic carol:
+
+
+### LeaveService — the same as an employee: 403, managers only
+GET {{server}}{{leave}}/getPendingApprovals()
+Authorization: Basic alice:
+
+
+### LeaveService — approve the first waiting request; updates its PDF
+POST {{server}}{{leave}}/decideLeave
+Content-Type: application/json
+Authorization: Basic carol:
+
+{ "requestId": "{{pending.response.body.value[0].ID}}", "decision": "approve" }
+
+
+### LeaveService — reject needs a note: 400 without one
+POST {{server}}{{leave}}/decideLeave
+Content-Type: application/json
+Authorization: Basic carol:
+
+{ "requestId": "{{pending.response.body.value[0].ID}}", "decision": "reject" }
+

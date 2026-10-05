@@ -1,0 +1,120 @@
+@server=http://localhost:4004
+@agent=/a2a/hr-agent
+
+# `npm run hybrid` (cds watch --profile hybrid) runs the agent locally against
+# the real model: AI Core through the AICORE_DESTINATION destination. This is
+# the only way to see the agent reason and pick its tools — the local
+# profile's `llm-mock` never calls one.
+#
+# Logins are the mocked users from package.json (alice, bob, carol; empty
+# password). The conversation below is the one the agent is built for.
+
+
+### Agent card
+# @name agent_card
+GET {{server}}{{agent}}/.well-known/agent-card.json
+Authorization: Basic alice:
+
+
+### 1. Ask for a leave in one sentence
+# Watch the server log: the model should call `planAnnualLeave` with
+# startDay 10, startMonth 11, workingDays 3 and no year, and answer with the
+# plan instead of filing it. Filing straight away, or asking for the year, is
+# the first sign that AGENTS.md or the tool descriptions need work.
+# @name plan
+POST {{server}}{{agent}}/
+Content-Type: application/json
+Authorization: Basic alice:
+
+{
+  "jsonrpc": "2.0",
+  "id": "1",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-1",
+      "role": "user",
+      "parts": [
+        { "kind": "text", "text": "I'd like to take 3 days of annual leave starting 10 November, can you plan it?" }
+      ]
+    }
+  }
+}
+
+
+### 2. Agree to the plan
+# The model should now call `submitAnnualLeave`. Because the action carries
+# `@agent.hitl`, the task stops in `input-required` with an approval request
+# instead of completing.
+# @name agree
+POST {{server}}{{agent}}/
+Content-Type: application/json
+Authorization: Basic alice:
+
+{
+  "jsonrpc": "2.0",
+  "id": "2",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-2",
+      "role": "user",
+      "contextId": "{{plan.response.body.result.contextId}}",
+      "parts": [
+        { "kind": "text", "text": "Yes, please file it." }
+      ]
+    }
+  }
+}
+
+
+### 3. Approve the tool call
+# Answering the paused task with "approve" lets `submitAnnualLeave` run. The
+# reply should carry the request number and a link to the PDF.
+# @name approve
+POST {{server}}{{agent}}/
+Content-Type: application/json
+Authorization: Basic alice:
+
+{
+  "jsonrpc": "2.0",
+  "id": "3",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-3",
+      "role": "user",
+      "contextId": "{{plan.response.body.result.contextId}}",
+      "taskId": "{{agree.response.body.result.id}}",
+      "parts": [
+        { "kind": "text", "text": "approve" }
+      ]
+    }
+  }
+}
+
+
+### Ask for something out of scope
+# AGENTS.md says to name the limit: sick leave is handled by HR directly.
+POST {{server}}{{agent}}/
+Content-Type: application/json
+Authorization: Basic alice:
+
+{
+  "jsonrpc": "2.0",
+  "id": "4",
+  "method": "message/send",
+  "params": {
+    "message": {
+      "kind": "message",
+      "messageId": "msg-4",
+      "role": "user",
+      "parts": [
+        { "kind": "text", "text": "I'm sick tomorrow and will get a doctor's note. Can you enter sick leave?" }
+      ]
+    }
+  }
+}
